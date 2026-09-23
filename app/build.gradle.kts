@@ -11,8 +11,8 @@ android {
         applicationId = "com.pedro.finances"
         minSdk = 24
         targetSdk = 37
-        versionCode = 3
-        versionName = "v1.0.2"
+        versionCode = 4
+        versionName = "v1.0.3"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
