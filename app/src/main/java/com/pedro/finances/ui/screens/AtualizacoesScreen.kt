@@ -32,7 +32,7 @@ fun AtualizacoesScreen(onLogout: () -> Unit) {
     val context = LocalContext.current
     val sharedPreferences = remember { context.getSharedPreferences("finance_prefs", Context.MODE_PRIVATE) }
 
-    var repoOwner by remember { mutableStateOf(sharedPreferences.getString("github_owner", "seu-usuario") ?: "seu-usuario") }
+    var repoOwner by remember { mutableStateOf(sharedPreferences.getString("github_owner", "pedrossantos16") ?: "pedrossantos16") }
     var repoName by remember { mutableStateOf(sharedPreferences.getString("github_repo", "FinanceS") ?: "FinanceS") }
     var showConfigDialog by remember { mutableStateOf(false) }
 
@@ -87,8 +87,8 @@ fun AtualizacoesScreen(onLogout: () -> Unit) {
 
                 Text(
                     text = updateStatus,
-                    color = if (latestVersion.isNotEmpty() && latestVersion != currentVersion) Color(0xFFFFD700) else Color.White,
-                    fontSize = 15.sp,
+                    color = if (latestVersion.isNotEmpty() && latestVersion.removePrefix("v").trim() != currentVersion.removePrefix("v").trim()) Color(0xFFFFD700) else Color.White,
+                    fontSize = 14.sp,
                     fontWeight = FontWeight.Medium
                 )
             }
@@ -101,15 +101,15 @@ fun AtualizacoesScreen(onLogout: () -> Unit) {
             modifier = Modifier.fillMaxWidth(),
             colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFFFD700))
         ) {
-            Text("Configurar Repositório GitHub ($repoOwner/$repoName)", fontSize = 12.sp)
+            Text("Repositório: $repoOwner/$repoName (Alterar)", fontSize = 12.sp)
         }
 
         Spacer(modifier = Modifier.height(12.dp))
 
         Button(
             onClick = {
-                if (repoOwner == "seu-usuario") {
-                    updateStatus = "Configure seu usuário do GitHub acima!"
+                if (repoOwner.isBlank() || repoOwner == "seu-usuario") {
+                    updateStatus = "Configure seu usuário do GitHub!"
                     return@Button
                 }
 
@@ -118,45 +118,59 @@ fun AtualizacoesScreen(onLogout: () -> Unit) {
                 coroutineScope.launch {
                     val result = withContext(Dispatchers.IO) {
                         try {
-                            val url = URL("https://api.github.com/repos/$repoOwner/$repoName/releases/latest")
+                            // Fetch all releases to avoid 404 on latest if marked prerelease/draft
+                            val url = URL("https://api.github.com/repos/$repoOwner/$repoName/releases")
                             
                             val connection = (url.openConnection() as HttpURLConnection).apply {
                                 requestMethod = "GET"
                                 setRequestProperty("Accept", "application/vnd.github.v3+json")
-                                connectTimeout = 4000
-                                readTimeout = 4000
+                                connectTimeout = 5000
+                                readTimeout = 5000
                             }
 
                             if (connection.responseCode == 200) {
                                 val response = connection.inputStream.bufferedReader().use { it.readText() }
                                 val tagRegex = "\"tag_name\"\\s*:\\s*\"([^\"]+)\"".toRegex()
                                 val match = tagRegex.find(response)
-                                val tagName = match?.groups?.get(1)?.value ?: currentVersion
+                                val tagName = match?.groups?.get(1)?.value
 
                                 val htmlUrlRegex = "\"html_url\"\\s*:\\s*\"([^\"]+)\"".toRegex()
                                 val htmlMatch = htmlUrlRegex.find(response)
                                 val htmlUrl = htmlMatch?.groups?.get(1)?.value ?: "https://github.com/$repoOwner/$repoName/releases"
 
-                                if (tagName != currentVersion) {
-                                    Triple(true, tagName, htmlUrl)
+                                if (tagName != null) {
+                                    val cleanTag = tagName.removePrefix("v").removePrefix("V").trim()
+                                    val cleanCurrent = currentVersion.removePrefix("v").removePrefix("V").trim()
+
+                                    if (cleanTag != cleanCurrent) {
+                                        Triple(true, tagName, htmlUrl)
+                                    } else {
+                                        Triple(false, currentVersion, "")
+                                    }
                                 } else {
                                     Triple(false, currentVersion, "")
                                 }
                             } else {
-                                Triple(false, currentVersion, "")
+                                // Return error status for debugging (e.g. 404 Not Found)
+                                val errCode = connection.responseCode
+                                throw Exception("HTTP $errCode (Verifique se o repo é público)")
                             }
                         } catch (e: Exception) {
-                            Triple(false, currentVersion, "")
+                            Triple(false, "ERRO: ${e.message ?: "Falha de rede"}", "")
                         }
                     }
 
                     isChecking = false
-                    if (result.first && result.second != currentVersion) {
+                    if (result.first) {
                         latestVersion = result.second
                         releaseUrl = result.third
                         updateStatus = "Atualização $latestVersion disponível!"
                     } else {
-                        updateStatus = "Sem atualizações disponíveis"
+                        if (result.second.startsWith("ERRO:")) {
+                            updateStatus = result.second
+                        } else {
+                            updateStatus = "Sem atualizações disponíveis"
+                        }
                         latestVersion = ""
                     }
                 }
@@ -172,7 +186,7 @@ fun AtualizacoesScreen(onLogout: () -> Unit) {
             }
         }
 
-        if (latestVersion.isNotEmpty() && latestVersion != currentVersion) {
+        if (latestVersion.isNotEmpty() && latestVersion.removePrefix("v").trim() != currentVersion.removePrefix("v").trim()) {
             Spacer(modifier = Modifier.height(12.dp))
             Button(
                 onClick = {
@@ -264,7 +278,7 @@ fun AtualizacoesScreen(onLogout: () -> Unit) {
             title = { Text("Configurar Repositório GitHub", color = Color(0xFFFFD700), fontWeight = FontWeight.Bold) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("Insira seu nome de usuário do GitHub e o nome do repositório onde criou o Release:", color = Color.White, fontSize = 13.sp)
+                    Text("Insira seu usuário do GitHub e o nome do repositório:", color = Color.White, fontSize = 13.sp)
                     OutlinedTextField(
                         value = tempOwner,
                         onValueChange = { tempOwner = it },
