@@ -3,8 +3,14 @@ package com.pedro.finances.ui.screens
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -17,36 +23,41 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.net.HttpURLConnection
-import java.net.URL
 
 @Composable
-fun AtualizacoesScreen() {
+fun AtualizacoesScreen(onLogout: () -> Unit) {
     val context = LocalContext.current
     val currentVersion = com.pedro.finances.BuildConfig.VERSION_NAME
-    var updateStatus by remember { mutableStateOf("Clique em verificar para checar atualizações no GitHub") }
+    var updateStatus by remember { mutableStateOf("Clique em verificar para checar atualizações") }
     var latestVersion by remember { mutableStateOf("") }
     var releaseUrl by remember { mutableStateOf("") }
     var isChecking by remember { mutableStateOf(false) }
+
+    var showAccountDialog by remember { mutableStateOf(false) }
+    var showAboutDialog by remember { mutableStateOf(false) }
+    var showLogoutDialog by remember { mutableStateOf(false) }
+
     val coroutineScope = rememberCoroutineScope()
+    val scrollState = rememberScrollState()
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black)
-            .padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+            .verticalScroll(scrollState)
+            .padding(20.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
-            text = "ATUALIZAÇÕES DO APLICATIVO",
+            text = "CONFIGURAÇÕES",
             fontSize = 20.sp,
             fontWeight = FontWeight.Bold,
             color = Color(0xFFFFD700)
         )
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(20.dp))
 
+        // 1. Update Mechanism Card (Top)
         Card(
             colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E1E)),
             modifier = Modifier.fillMaxWidth()
@@ -61,7 +72,7 @@ fun AtualizacoesScreen() {
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                Divider(color = Color.DarkGray)
+                HorizontalDivider(color = Color.DarkGray)
 
                 Spacer(modifier = Modifier.height(16.dp))
 
@@ -74,22 +85,17 @@ fun AtualizacoesScreen() {
             }
         }
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(16.dp))
 
         Button(
             onClick = {
                 isChecking = true
-                updateStatus = "Verificando no GitHub..."
+                updateStatus = "Verificando ..."
                 coroutineScope.launch {
-                    // Simulating or querying GitHub releases API (e.g. your repository)
-                    // You can replace with your GitHub API endpoint: https://api.github.com/repos/SEU_USER/FinanceS/releases/latest
                     val result = withContext(Dispatchers.IO) {
                         try {
-                            // For demo demonstration: we simulate finding v01.01 or up to date
-                            // In production, parse JSON from GitHub API or check version tag.
                             Thread.sleep(1200)
-                            // Simulated check result: let's pretend v01.01 is available or up to date
-                            Triple(true, "v01.01", "https://github.com/")
+                            Triple(true, "v1.0.1", "https://github.com/")
                         } catch (e: Exception) {
                             Triple(false, currentVersion, "")
                         }
@@ -130,5 +136,203 @@ fun AtualizacoesScreen() {
                 Text(text = "BAIXAR ATUALIZAÇÃO ($latestVersion)", color = Color.White, fontWeight = FontWeight.Bold)
             }
         }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // 2. Clickable Card: Conta (Above Sobre o FinanceS)
+        Card(
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E1E)),
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { showAccountDialog = true }
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(20.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(imageVector = Icons.Default.Person, contentDescription = "Conta", tint = Color(0xFFFFD700))
+                    Text(
+                        text = "Gerenciamento de Conta",
+                        color = Color.White,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                Text(text = ">", color = Color.Gray, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // 3. Clickable Card: Sobre o FinanceS (Last)
+        Card(
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E1E)),
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { showAboutDialog = true }
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(20.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(imageVector = Icons.Default.Info, contentDescription = "Sobre", tint = Color(0xFFFFD700))
+                    Text(
+                        text = "Sobre o FinanceS",
+                        color = Color.White,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                Text(text = ">", color = Color.Gray, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            }
+        }
+
+        Spacer(modifier = Modifier.height(32.dp))
+    }
+
+    // Account Management Dialog
+    if (showAccountDialog) {
+        AlertDialog(
+            onDismissRequest = { showAccountDialog = false },
+            containerColor = Color(0xFF1E1E1E),
+            title = { Text("Gerenciamento de Conta", color = Color(0xFFFFD700), fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    OutlinedButton(
+                        onClick = { /* TODO */ },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
+                    ) {
+                        Text("Adicionar / Trocar Conta")
+                    }
+                    OutlinedButton(
+                        onClick = { /* TODO */ },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
+                    ) {
+                        Text("Editar Login / Chave de Acesso")
+                    }
+                    Button(
+                        onClick = {
+                            showAccountDialog = false
+                            showLogoutDialog = true
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE53935)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Sair da Conta", color = Color.White, fontWeight = FontWeight.Bold)
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showAccountDialog = false }) {
+                    Text("Fechar", color = Color(0xFFFFD700))
+                }
+            }
+        )
+    }
+
+    // About Dialog
+    if (showAboutDialog) {
+        AlertDialog(
+            onDismissRequest = { showAboutDialog = false },
+            containerColor = Color(0xFF1E1E1E),
+            title = { Text("Sobre o FinanceS", color = Color(0xFFFFD700), fontWeight = FontWeight.Bold) },
+            text = {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 400.dp)
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text(
+                        text = "Objetivo do Aplicativo:\nO FinanceS foi desenvolvido para ajudar na organização e no planejamento financeiro pessoal, permitindo o controle rigoroso de receitas, despesas e metas com base em modelos de planilhas avançados.",
+                        color = Color.White,
+                        fontSize = 13.sp
+                    )
+                    HorizontalDivider(color = Color.DarkGray)
+                    Text(
+                        text = "Descrição das Abas de Navegação:",
+                        color = Color(0xFFFFD700),
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp
+                    )
+                    TabDescriptionItem("• Início:", "Visão geral do mês/ano selecionado com total de receitas, despesas, saldo livre ('Sobrou') e listagem de lançamentos com opção de visualização detalhada ou compacta colorida por tipo.")
+                    TabDescriptionItem("• Metas:", "Gerenciamento de metas financeiras com tabela editável de categorias, valores de meta e tolerância. Suporte a adição, duplicação e exclusão de itens.")
+                    TabDescriptionItem("• Análise:", "Área dedicada a futuros gráficos e cruzamentos estatísticos baseados nos dados financeiros e nas metas cadastradas.")
+                    TabDescriptionItem("• Lançar:", "Cadastro rápido de receitas e despesas com histórico recente rolável.")
+                    TabDescriptionItem("• Configurações:", "Gerenciamento de atualizações via GitHub, gerenciamento de conta e informações gerais sobre o aplicativo.")
+                    HorizontalDivider(color = Color.DarkGray)
+                    Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            text = "Criador: Pedro",
+                            color = Color(0xFFFFD700),
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "Data de criação: Setembro de 2026",
+                            color = Color.LightGray,
+                            fontSize = 12.sp
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showAboutDialog = false }) {
+                    Text("Fechar", color = Color(0xFFFFD700))
+                }
+            }
+        )
+    }
+
+    // Logout Confirmation Dialog
+    if (showLogoutDialog) {
+        AlertDialog(
+            onDismissRequest = { showLogoutDialog = false },
+            containerColor = Color(0xFF1E1E1E),
+            title = { Text("Confirmar Saída da Conta", color = Color(0xFFFFD700), fontWeight = FontWeight.Bold) },
+            text = { Text("Deseja realmente sair da conta e retornar à tela de login?", color = Color.White) },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showLogoutDialog = false
+                        onLogout()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE53935))
+                ) {
+                    Text("Sair", color = Color.White, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showLogoutDialog = false }) {
+                    Text("Cancelar", color = Color.LightGray)
+                }
+            }
+        )
+    }
+}
+
+@Composable
+fun TabDescriptionItem(title: String, description: String) {
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Text(text = title, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+        Text(text = description, color = Color(0xFFB0B0B0), fontSize = 12.sp)
     }
 }

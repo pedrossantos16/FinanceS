@@ -6,8 +6,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Analytics
+import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -17,6 +20,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import com.pedro.finances.data.DatabaseHelper
+import com.pedro.finances.ui.screens.AnaliseScreen
 import com.pedro.finances.ui.screens.AtualizacoesScreen
 import com.pedro.finances.ui.screens.InicioScreen
 import com.pedro.finances.ui.screens.LancamentosScreen
@@ -24,15 +28,22 @@ import com.pedro.finances.ui.screens.MetasScreen
 
 sealed class Screen(val route: String, val title: String, val icon: ImageVector) {
     object Inicio : Screen("inicio", "Início", Icons.Default.Home)
-    object Metas : Screen("metas", "Metas", Icons.Default.Star)
+    object Metas : Screen("metas", "Metas", Icons.Default.BarChart)
+    object Analise : Screen("analise", "Análise", Icons.Default.Analytics)
     object Lancamentos : Screen("lancamentos", "Lançar", Icons.Default.Add)
-    object Atualizacoes : Screen("atualizacoes", "Atualizações", Icons.Default.Refresh)
+    object Atualizacoes : Screen("atualizacoes", "Configurações", Icons.Default.Settings)
 }
 
 @Composable
-fun MainScreen(dbHelper: DatabaseHelper) {
+fun MainScreen(dbHelper: DatabaseHelper, onLogout: () -> Unit) {
     var currentScreen by remember { mutableStateOf<Screen>(Screen.Inicio) }
-    val screens = listOf(Screen.Inicio, Screen.Metas, Screen.Lancamentos, Screen.Atualizacoes)
+    val screens = listOf(
+        Screen.Inicio,
+        Screen.Metas,
+        Screen.Analise,
+        Screen.Lancamentos,
+        Screen.Atualizacoes
+    )
 
     Scaffold(
         containerColor = Color.Black,
@@ -56,7 +67,7 @@ fun MainScreen(dbHelper: DatabaseHelper) {
                     Row(
                         modifier = Modifier
                             .fillMaxSize()
-                            .padding(horizontal = 16.dp),
+                            .padding(horizontal = 8.dp),
                         horizontalArrangement = Arrangement.SpaceAround,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -67,7 +78,7 @@ fun MainScreen(dbHelper: DatabaseHelper) {
 
                             Box(
                                 modifier = Modifier
-                                    .size(48.dp)
+                                    .size(44.dp)
                                     .background(backgroundColor, CircleShape),
                                 contentAlignment = Alignment.Center
                             ) {
@@ -93,8 +104,9 @@ fun MainScreen(dbHelper: DatabaseHelper) {
             when (currentScreen) {
                 is Screen.Inicio -> InicioScreen(dbHelper)
                 is Screen.Metas -> MetasScreen(dbHelper)
+                is Screen.Analise -> AnaliseScreen(dbHelper)
                 is Screen.Lancamentos -> LancamentosScreen(dbHelper)
-                is Screen.Atualizacoes -> AtualizacoesScreen()
+                is Screen.Atualizacoes -> AtualizacoesScreen(onLogout)
             }
         }
     }

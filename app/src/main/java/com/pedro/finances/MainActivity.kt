@@ -28,7 +28,10 @@ class MainActivity : ComponentActivity() {
                         onLoginSuccess = { isLoggedIn = true }
                     )
                 } else {
-                    MainScreen(dbHelper = dbHelper)
+                    MainScreen(
+                        dbHelper = dbHelper,
+                        onLogout = { isLoggedIn = false }
+                    )
                 }
             }
         }

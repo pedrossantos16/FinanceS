@@ -16,10 +16,9 @@ data class TransactionModel(
 
 data class GoalModel(
     val id: Long,
-    val month: String,
     val category: String,
     val targetAmount: Double,
-    val achievedAmount: Double
+    val tolerance: Double
 )
 
 private data class TxDto(val month: String, val category: String, val amount: Double, val type: String)
@@ -28,7 +27,7 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
 
     companion object {
         private const val DATABASE_NAME = "finances.db"
-        private const val DATABASE_VERSION = 1
+        private const val DATABASE_VERSION = 2
 
         const val TABLE_USERS = "users"
         const val TABLE_TRANSACTIONS = "transactions"
@@ -59,17 +58,15 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
         db.execSQL("""
             CREATE TABLE $TABLE_GOALS (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                month TEXT,
                 category TEXT,
                 target_amount REAL,
-                achieved_amount REAL
+                tolerance REAL
             )
         """)
 
         // Insert initial test user
         db.execSQL("INSERT INTO $TABLE_USERS (cpf, access_key, name) VALUES ('12345678900', '1234', 'Pedro User')")
 
-        // Insert initial data from user's spreadsheet (AGOSTO & SETEMBRO)
         insertInitialData(db)
     }
 
@@ -81,8 +78,8 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
     }
 
     private fun insertInitialData(db: SQLiteDatabase) {
-        // AGOSTO Transactions
-        val agoTransactions = listOf(
+        // AGOSTO & SETEMBRO Transactions
+        val transactions = listOf(
             TxDto("AGOSTO", "SALÁRIO", 1854.15, "INCOME"),
             TxDto("AGOSTO", "ADIANTAMENTO", 1804.99, "INCOME"),
             TxDto("AGOSTO", "SENAI", 518.43, "EXPENSE"),
@@ -91,41 +88,7 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
             TxDto("AGOSTO", "EMERGÊNCIA", 59.90, "EXPENSE"),
             TxDto("AGOSTO", "LAZER", 297.15, "EXPENSE"),
             TxDto("AGOSTO", "INVESTIMENTO", 600.00, "EXPENSE"),
-            TxDto("AGOSTO", "NUBANK", 88.57, "EXPENSE")
-        )
-        for (t in agoTransactions) {
-            val values = ContentValues().apply {
-                put("month", t.month)
-                put("category", t.category)
-                put("amount", t.amount)
-                put("type", t.type)
-                put("description", "Lançamento inicial")
-            }
-            db.insert(TABLE_TRANSACTIONS, null, values)
-        }
-
-        // AGOSTO Goals
-        val agoGoals = listOf(
-            Triple("AGOSTO", "SENAI", 518.43 to 518.43),
-            Triple("AGOSTO", "LAZER", 600.00 to 957.02),
-            Triple("AGOSTO", "COMBUSTÍVEL", 510.00 to 600.00),
-            Triple("AGOSTO", "DÍZIMO", 300.00 to 0.00),
-            Triple("AGOSTO", "INVESTIMENTO", 600.00 to 600.00),
-            Triple("AGOSTO", "NUBANK", 226.88 to 0.00),
-            Triple("AGOSTO", "EMERGÊNCIA", 0.00 to 74.50)
-        )
-        for (g in agoGoals) {
-            val values = ContentValues().apply {
-                put("month", g.first)
-                put("category", g.second)
-                put("target_amount", g.third.first)
-                put("achieved_amount", g.third.second)
-            }
-            db.insert(TABLE_GOALS, null, values)
-        }
-
-        // SETEMBRO Transactions
-        val setTransactions = listOf(
+            TxDto("AGOSTO", "NUBANK", 88.57, "EXPENSE"),
             TxDto("SETEMBRO", "SALÁRIO", 1856.80, "INCOME"),
             TxDto("SETEMBRO", "ADIANTAMENTO", 1153.54, "INCOME"),
             TxDto("SETEMBRO", "TICKET ALIMENTAÇÃO", 510.97, "INCOME"),
@@ -137,33 +100,32 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
             TxDto("SETEMBRO", "LAZER", 292.97, "EXPENSE"),
             TxDto("SETEMBRO", "NUBANK", 265.45, "EXPENSE")
         )
-        for (t in setTransactions) {
+        for (t in transactions) {
             val values = ContentValues().apply {
                 put("month", t.month)
                 put("category", t.category)
                 put("amount", t.amount)
                 put("type", t.type)
-                put("description", "Lançamento inicial Setembro")
+                put("description", "Lançamento inicial")
             }
             db.insert(TABLE_TRANSACTIONS, null, values)
         }
 
-        // SETEMBRO Goals
-        val setGoals = listOf(
-            Triple("SETEMBRO", "SENAI", 518.43 to 518.43),
-            Triple("SETEMBRO", "LAZER", 300.00 to 300.00),
-            Triple("SETEMBRO", "COMBUSTÍVEL", 255.00 to 255.00),
-            Triple("SETEMBRO", "DÍZIMO", 300.00 to 300.00),
-            Triple("SETEMBRO", "INVESTIMENTO", 600.00 to 600.00),
-            Triple("SETEMBRO", "NUBANK", 226.88 to 226.88),
-            Triple("SETEMBRO", "EMERGÊNCIA", 0.00 to 0.00)
+        // Initial Goals (Category, Target, Tolerance)
+        val initialGoals = listOf(
+            Triple("SENAI", 518.43, 50.00),
+            Triple("LAZER", 600.00, 100.00),
+            Triple("COMBUSTÍVEL", 510.00, 50.00),
+            Triple("DÍZIMO", 300.00, 0.00),
+            Triple("INVESTIMENTO", 600.00, 0.00),
+            Triple("NUBANK", 226.88, 20.00),
+            Triple("EMERGÊNCIA", 0.00, 100.00)
         )
-        for (g in setGoals) {
+        for (g in initialGoals) {
             val values = ContentValues().apply {
-                put("month", g.first)
-                put("category", g.second)
-                put("target_amount", g.third.first)
-                put("achieved_amount", g.third.second)
+                put("category", g.first)
+                put("target_amount", g.second)
+                put("tolerance", g.third)
             }
             db.insert(TABLE_GOALS, null, values)
         }
@@ -199,25 +161,49 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
         return list
     }
 
-    fun getGoals(month: String): List<GoalModel> {
+    fun getGoals(): List<GoalModel> {
         val list = mutableListOf<GoalModel>()
         val db = readableDatabase
-        val cursor = db.rawQuery("SELECT id, month, category, target_amount, achieved_amount FROM $TABLE_GOALS WHERE month = ?", arrayOf(month))
+        val cursor = db.rawQuery("SELECT id, category, target_amount, tolerance FROM $TABLE_GOALS", null)
         if (cursor.moveToFirst()) {
             do {
                 list.add(
                     GoalModel(
                         id = cursor.getLong(0),
-                        month = cursor.getString(1),
-                        category = cursor.getString(2),
-                        targetAmount = cursor.getDouble(3),
-                        achievedAmount = cursor.getDouble(4)
+                        category = cursor.getString(1),
+                        targetAmount = cursor.getDouble(2),
+                        tolerance = cursor.getDouble(3)
                     )
                 )
             } while (cursor.moveToNext())
         }
         cursor.close()
         return list
+    }
+
+    fun addGoal(category: String, targetAmount: Double, tolerance: Double) {
+        val db = writableDatabase
+        val values = ContentValues().apply {
+            put("category", category)
+            put("target_amount", targetAmount)
+            put("tolerance", tolerance)
+        }
+        db.insert(TABLE_GOALS, null, values)
+    }
+
+    fun updateGoal(id: Long, category: String, targetAmount: Double, tolerance: Double) {
+        val db = writableDatabase
+        val values = ContentValues().apply {
+            put("category", category)
+            put("target_amount", targetAmount)
+            put("tolerance", tolerance)
+        }
+        db.update(TABLE_GOALS, values, "id = ?", arrayOf(id.toString()))
+    }
+
+    fun deleteGoal(id: Long) {
+        val db = writableDatabase
+        db.delete(TABLE_GOALS, "id = ?", arrayOf(id.toString()))
     }
 
     fun addTransaction(month: String, category: String, amount: Double, type: String, description: String) {
