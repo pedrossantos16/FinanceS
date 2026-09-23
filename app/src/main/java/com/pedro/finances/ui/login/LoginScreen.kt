@@ -98,7 +98,7 @@ fun LoginScreen(
 
         // Version label at bottom
         Text(
-            text = "v01.00",
+            text = com.pedro.finances.BuildConfig.VERSION_NAME,
             color = Color.LightGray,
             fontSize = 12.sp,
             modifier = Modifier

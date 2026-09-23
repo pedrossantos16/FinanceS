@@ -23,7 +23,7 @@ import java.net.URL
 @Composable
 fun AtualizacoesScreen() {
     val context = LocalContext.current
-    val currentVersion = "v01.00"
+    val currentVersion = com.pedro.finances.BuildConfig.VERSION_NAME
     var updateStatus by remember { mutableStateOf("Clique em verificar para checar atualizações no GitHub") }
     var latestVersion by remember { mutableStateOf("") }
     var releaseUrl by remember { mutableStateOf("") }
