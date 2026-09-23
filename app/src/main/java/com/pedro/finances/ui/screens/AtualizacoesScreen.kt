@@ -23,6 +23,8 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.net.HttpURLConnection
+import java.net.URL
 
 @Composable
 fun AtualizacoesScreen(onLogout: () -> Unit) {
@@ -90,13 +92,43 @@ fun AtualizacoesScreen(onLogout: () -> Unit) {
         Button(
             onClick = {
                 isChecking = true
-                updateStatus = "Verificando ..."
+                updateStatus = "Verificando no GitHub..."
                 coroutineScope.launch {
                     val result = withContext(Dispatchers.IO) {
                         try {
-                            Thread.sleep(1200)
-                            Triple(true, "v1.0.1", "https://github.com/")
+                            // IMPORTANTE: Substitua "seu-usuario" pelo seu usuário real do GitHub
+                            // e "FinanceS" pelo nome do seu repositório quando publicar.
+                            val repoOwner = "seu-usuario"
+                            val repoName = "FinanceS"
+                            val url = URL("https://api.github.com/repos/$repoOwner/$repoName/releases/latest")
+                            
+                            val connection = (url.openConnection() as HttpURLConnection).apply {
+                                requestMethod = "GET"
+                                setRequestProperty("Accept", "application/vnd.github.v3+json")
+                                connectTimeout = 4000
+                                readTimeout = 4000
+                            }
+
+                            if (connection.responseCode == 200) {
+                                val response = connection.inputStream.bufferedReader().use { it.readText() }
+                                val tagRegex = "\"tag_name\"\\s*:\\s*\"([^\"]+)\"".toRegex()
+                                val match = tagRegex.find(response)
+                                val tagName = match?.groups?.get(1)?.value ?: currentVersion
+
+                                val htmlUrlRegex = "\"html_url\"\\s*:\\s*\"([^\"]+)\"".toRegex()
+                                val htmlMatch = htmlUrlRegex.find(response)
+                                val htmlUrl = htmlMatch?.groups?.get(1)?.value ?: "https://github.com/$repoOwner/$repoName/releases"
+
+                                if (tagName != currentVersion) {
+                                    Triple(true, tagName, htmlUrl)
+                                } else {
+                                    Triple(false, currentVersion, "")
+                                }
+                            } else {
+                                Triple(false, currentVersion, "")
+                            }
                         } catch (e: Exception) {
+                            // Se o repositório ainda não existir ou sem conexão, retorna sem atualizações
                             Triple(false, currentVersion, "")
                         }
                     }

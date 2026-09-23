@@ -16,6 +16,7 @@ data class TransactionModel(
 
 data class GoalModel(
     val id: Long,
+    val tableName: String,
     val category: String,
     val targetAmount: Double,
     val tolerance: Double
@@ -27,7 +28,7 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
 
     companion object {
         private const val DATABASE_NAME = "finances.db"
-        private const val DATABASE_VERSION = 2
+        private const val DATABASE_VERSION = 3
 
         const val TABLE_USERS = "users"
         const val TABLE_TRANSACTIONS = "transactions"
@@ -58,15 +59,14 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
         db.execSQL("""
             CREATE TABLE $TABLE_GOALS (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
+                table_name TEXT,
                 category TEXT,
                 target_amount REAL,
                 tolerance REAL
             )
         """)
 
-        // Insert initial test user
         db.execSQL("INSERT INTO $TABLE_USERS (cpf, access_key, name) VALUES ('12345678900', '1234', 'Pedro User')")
-
         insertInitialData(db)
     }
 
@@ -78,7 +78,6 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
     }
 
     private fun insertInitialData(db: SQLiteDatabase) {
-        // AGOSTO & SETEMBRO Transactions
         val transactions = listOf(
             TxDto("AGOSTO", "SALÁRIO", 1854.15, "INCOME"),
             TxDto("AGOSTO", "ADIANTAMENTO", 1804.99, "INCOME"),
@@ -111,7 +110,6 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
             db.insert(TABLE_TRANSACTIONS, null, values)
         }
 
-        // Initial Goals (Category, Target, Tolerance)
         val initialGoals = listOf(
             Triple("SENAI", 518.43, 50.00),
             Triple("LAZER", 600.00, 100.00),
@@ -123,6 +121,7 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
         )
         for (g in initialGoals) {
             val values = ContentValues().apply {
+                put("table_name", "GERAL DO MÊS")
                 put("category", g.first)
                 put("target_amount", g.second)
                 put("tolerance", g.third)
@@ -161,18 +160,20 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
         return list
     }
 
-    fun getGoals(): List<GoalModel> {
-        val list = mutableListOf<GoalModel>()
+    fun getAllTransactions(): List<TransactionModel> {
+        val list = mutableListOf<TransactionModel>()
         val db = readableDatabase
-        val cursor = db.rawQuery("SELECT id, category, target_amount, tolerance FROM $TABLE_GOALS", null)
+        val cursor = db.rawQuery("SELECT id, month, category, amount, type, description FROM $TABLE_TRANSACTIONS", null)
         if (cursor.moveToFirst()) {
             do {
                 list.add(
-                    GoalModel(
+                    TransactionModel(
                         id = cursor.getLong(0),
-                        category = cursor.getString(1),
-                        targetAmount = cursor.getDouble(2),
-                        tolerance = cursor.getDouble(3)
+                        month = cursor.getString(1),
+                        category = cursor.getString(2),
+                        amount = cursor.getDouble(3),
+                        type = cursor.getString(4),
+                        description = cursor.getString(5)
                     )
                 )
             } while (cursor.moveToNext())
@@ -181,9 +182,31 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
         return list
     }
 
-    fun addGoal(category: String, targetAmount: Double, tolerance: Double) {
+    fun getGoals(): List<GoalModel> {
+        val list = mutableListOf<GoalModel>()
+        val db = readableDatabase
+        val cursor = db.rawQuery("SELECT id, table_name, category, target_amount, tolerance FROM $TABLE_GOALS", null)
+        if (cursor.moveToFirst()) {
+            do {
+                list.add(
+                    GoalModel(
+                        id = cursor.getLong(0),
+                        tableName = cursor.getString(1) ?: "GERAL",
+                        category = cursor.getString(2),
+                        targetAmount = cursor.getDouble(3),
+                        tolerance = cursor.getDouble(4)
+                    )
+                )
+            } while (cursor.moveToNext())
+        }
+        cursor.close()
+        return list
+    }
+
+    fun addGoal(tableName: String, category: String, targetAmount: Double, tolerance: Double) {
         val db = writableDatabase
         val values = ContentValues().apply {
+            put("table_name", tableName)
             put("category", category)
             put("target_amount", targetAmount)
             put("tolerance", tolerance)
@@ -191,9 +214,10 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
         db.insert(TABLE_GOALS, null, values)
     }
 
-    fun updateGoal(id: Long, category: String, targetAmount: Double, tolerance: Double) {
+    fun updateGoal(id: Long, tableName: String, category: String, targetAmount: Double, tolerance: Double) {
         val db = writableDatabase
         val values = ContentValues().apply {
+            put("table_name", tableName)
             put("category", category)
             put("target_amount", targetAmount)
             put("tolerance", tolerance)
@@ -204,6 +228,11 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
     fun deleteGoal(id: Long) {
         val db = writableDatabase
         db.delete(TABLE_GOALS, "id = ?", arrayOf(id.toString()))
+    }
+
+    fun deleteTable(tableName: String) {
+        val db = writableDatabase
+        db.delete(TABLE_GOALS, "table_name = ?", arrayOf(tableName))
     }
 
     fun addTransaction(month: String, category: String, amount: Double, type: String, description: String) {
