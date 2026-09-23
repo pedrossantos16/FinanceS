@@ -7,6 +7,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -18,7 +19,7 @@ import androidx.compose.ui.unit.sp
 import com.pedro.finances.data.DatabaseHelper
 
 @Composable
-fun LancamentosScreen(dbHelper: DatabaseHelper) {
+fun LancamentosScreen(dbHelper: DatabaseHelper, userCpf: String) {
     var selectedMonth by remember { mutableStateOf("AGOSTO") }
     var selectedYear by remember { mutableStateOf(2026) }
     var expanded by remember { mutableStateOf(false) }
@@ -29,10 +30,10 @@ fun LancamentosScreen(dbHelper: DatabaseHelper) {
     var type by remember { mutableStateOf("EXPENSE") }
     var successMessage by remember { mutableStateOf("") }
 
-    var transactions by remember { mutableStateOf(dbHelper.getTransactions(selectedMonth)) }
+    var transactions by remember { mutableStateOf(dbHelper.getTransactions(selectedMonth, userCpf)) }
 
-    LaunchedEffect(selectedMonth) {
-        transactions = dbHelper.getTransactions(selectedMonth)
+    LaunchedEffect(selectedMonth, userCpf) {
+        transactions = dbHelper.getTransactions(selectedMonth, userCpf)
     }
 
     Column(
@@ -52,7 +53,7 @@ fun LancamentosScreen(dbHelper: DatabaseHelper) {
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        // Month & Year Selector Dropdown (same as InicioScreen)
+        // Month & Year Selector Dropdown
         Box(
             modifier = Modifier.fillMaxWidth(),
             contentAlignment = Alignment.Center
@@ -209,12 +210,12 @@ fun LancamentosScreen(dbHelper: DatabaseHelper) {
             onClick = {
                 val parsedAmount = amount.toDoubleOrNull()
                 if (category.isNotEmpty() && parsedAmount != null) {
-                    dbHelper.addTransaction(selectedMonth, category.uppercase(), parsedAmount, type, description)
+                    dbHelper.addTransaction(selectedMonth, category.uppercase(), parsedAmount, type, description, userCpf)
                     successMessage = "Lançamento salvo!"
                     category = ""
                     amount = ""
                     description = ""
-                    transactions = dbHelper.getTransactions(selectedMonth)
+                    transactions = dbHelper.getTransactions(selectedMonth, userCpf)
                 } else {
                     successMessage = "Preencha categoria e valor válido."
                 }
@@ -236,7 +237,6 @@ fun LancamentosScreen(dbHelper: DatabaseHelper) {
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        // Scrollable history list
         LazyColumn(
             modifier = Modifier
                 .fillMaxWidth()
@@ -255,16 +255,35 @@ fun LancamentosScreen(dbHelper: DatabaseHelper) {
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Column {
+                        Column(modifier = Modifier.weight(1f)) {
                             Text(text = tx.category, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                             Text(text = tx.description, color = Color.Gray, fontSize = 11.sp)
                         }
-                        Text(
-                            text = "${if (tx.type == "INCOME") "+" else "-"} R$ %.2f".format(tx.amount),
-                            color = if (tx.type == "INCOME") Color(0xFF4CAF50) else Color(0xFFE53935),
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 13.sp
-                        )
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "${if (tx.type == "INCOME") "+" else "-"} R$ %.2f".format(tx.amount),
+                                color = if (tx.type == "INCOME") Color(0xFF4CAF50) else Color(0xFFE53935),
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.sp
+                            )
+                            IconButton(
+                                onClick = {
+                                    dbHelper.deleteTransaction(tx.id, userCpf)
+                                    transactions = dbHelper.getTransactions(selectedMonth, userCpf)
+                                },
+                                modifier = Modifier.size(32.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Delete,
+                                    contentDescription = "Excluir",
+                                    tint = Color.Red,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
                     }
                 }
             }

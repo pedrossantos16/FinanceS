@@ -11,7 +11,8 @@ data class TransactionModel(
     val category: String,
     val amount: Double,
     val type: String, // INCOME or EXPENSE
-    val description: String
+    val description: String,
+    val userCpf: String
 )
 
 data class GoalModel(
@@ -19,16 +20,15 @@ data class GoalModel(
     val tableName: String,
     val category: String,
     val targetAmount: Double,
-    val tolerance: Double
+    val tolerance: Double,
+    val userCpf: String
 )
-
-private data class TxDto(val month: String, val category: String, val amount: Double, val type: String)
 
 class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null, DATABASE_VERSION) {
 
     companion object {
         private const val DATABASE_NAME = "finances.db"
-        private const val DATABASE_VERSION = 3
+        private const val DATABASE_VERSION = 5
 
         const val TABLE_USERS = "users"
         const val TABLE_TRANSACTIONS = "transactions"
@@ -41,7 +41,8 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 cpf TEXT UNIQUE,
                 access_key TEXT,
-                name TEXT
+                name TEXT,
+                email TEXT
             )
         """)
 
@@ -52,7 +53,8 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
                 category TEXT,
                 amount REAL,
                 type TEXT,
-                description TEXT
+                description TEXT,
+                user_cpf TEXT
             )
         """)
 
@@ -62,12 +64,13 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
                 table_name TEXT,
                 category TEXT,
                 target_amount REAL,
-                tolerance REAL
+                tolerance REAL,
+                user_cpf TEXT
             )
         """)
 
-        db.execSQL("INSERT INTO $TABLE_USERS (cpf, access_key, name) VALUES ('12345678900', '1234', 'Pedro User')")
-        insertInitialData(db)
+        // Insert default demo user
+        db.execSQL("INSERT INTO $TABLE_USERS (cpf, access_key, name, email) VALUES ('12345678900', '1234', 'Pedro User', 'pedro@email.com')")
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
@@ -77,71 +80,72 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
         onCreate(db)
     }
 
-    private fun insertInitialData(db: SQLiteDatabase) {
-        val transactions = listOf(
-            TxDto("AGOSTO", "SALÁRIO", 1854.15, "INCOME"),
-            TxDto("AGOSTO", "ADIANTAMENTO", 1804.99, "INCOME"),
-            TxDto("AGOSTO", "SENAI", 518.43, "EXPENSE"),
-            TxDto("AGOSTO", "FATURA INTER", 4.50, "EXPENSE"),
-            TxDto("AGOSTO", "COMBUSTÍVEL", 300.00, "EXPENSE"),
-            TxDto("AGOSTO", "EMERGÊNCIA", 59.90, "EXPENSE"),
-            TxDto("AGOSTO", "LAZER", 297.15, "EXPENSE"),
-            TxDto("AGOSTO", "INVESTIMENTO", 600.00, "EXPENSE"),
-            TxDto("AGOSTO", "NUBANK", 88.57, "EXPENSE"),
-            TxDto("SETEMBRO", "SALÁRIO", 1856.80, "INCOME"),
-            TxDto("SETEMBRO", "ADIANTAMENTO", 1153.54, "INCOME"),
-            TxDto("SETEMBRO", "TICKET ALIMENTAÇÃO", 510.97, "INCOME"),
-            TxDto("SETEMBRO", "GASTO TICKET", 482.96, "EXPENSE"),
-            TxDto("SETEMBRO", "SENAI", 518.43, "EXPENSE"),
-            TxDto("SETEMBRO", "FATURA INTER", 4.50, "EXPENSE"),
-            TxDto("SETEMBRO", "COMBUSTÍVEL", 180.00, "EXPENSE"),
-            TxDto("SETEMBRO", "EMERGÊNCIA", 572.73, "EXPENSE"),
-            TxDto("SETEMBRO", "LAZER", 292.97, "EXPENSE"),
-            TxDto("SETEMBRO", "NUBANK", 265.45, "EXPENSE")
-        )
-        for (t in transactions) {
-            val values = ContentValues().apply {
-                put("month", t.month)
-                put("category", t.category)
-                put("amount", t.amount)
-                put("type", t.type)
-                put("description", "Lançamento inicial")
-            }
-            db.insert(TABLE_TRANSACTIONS, null, values)
-        }
-
-        val initialGoals = listOf(
-            Triple("SENAI", 518.43, 50.00),
-            Triple("LAZER", 600.00, 100.00),
-            Triple("COMBUSTÍVEL", 510.00, 50.00),
-            Triple("DÍZIMO", 300.00, 0.00),
-            Triple("INVESTIMENTO", 600.00, 0.00),
-            Triple("NUBANK", 226.88, 20.00),
-            Triple("EMERGÊNCIA", 0.00, 100.00)
-        )
-        for (g in initialGoals) {
-            val values = ContentValues().apply {
-                put("table_name", "GERAL DO MÊS")
-                put("category", g.first)
-                put("target_amount", g.second)
-                put("tolerance", g.third)
-            }
-            db.insert(TABLE_GOALS, null, values)
-        }
-    }
-
     fun validateUser(cpf: String, key: String): Boolean {
+        val cleanCpf = cpf.filter { it.isDigit() }
         val db = readableDatabase
-        val cursor = db.rawQuery("SELECT * FROM $TABLE_USERS WHERE cpf = ? AND access_key = ?", arrayOf(cpf, key))
+        val cursor = db.rawQuery("SELECT * FROM $TABLE_USERS WHERE cpf = ? AND access_key = ?", arrayOf(cleanCpf, key))
         val exists = cursor.count > 0
         cursor.close()
         return exists
     }
 
-    fun getTransactions(month: String): List<TransactionModel> {
+    fun userExists(cpf: String): Boolean {
+        val cleanCpf = cpf.filter { it.isDigit() }
+        val db = readableDatabase
+        val cursor = db.rawQuery("SELECT * FROM $TABLE_USERS WHERE cpf = ?", arrayOf(cleanCpf))
+        val exists = cursor.count > 0
+        cursor.close()
+        return exists
+    }
+
+    fun getUserEmail(cpf: String): String? {
+        val cleanCpf = cpf.filter { it.isDigit() }
+        val db = readableDatabase
+        var email: String? = null
+        val cursor = db.rawQuery("SELECT email FROM $TABLE_USERS WHERE cpf = ?", arrayOf(cleanCpf))
+        if (cursor.moveToFirst()) {
+            email = cursor.getString(0)
+        }
+        cursor.close()
+        return email
+    }
+
+    fun addUser(cpf: String, accessKey: String, name: String, email: String): Boolean {
+        val cleanCpf = cpf.filter { it.isDigit() }
+        return try {
+            val db = writableDatabase
+            val values = ContentValues().apply {
+                put("cpf", cleanCpf)
+                put("access_key", accessKey)
+                put("name", name)
+                put("email", email)
+            }
+            val id = db.insert(TABLE_USERS, null, values)
+            id != -1L
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    fun updateAccessKey(cpf: String, newKey: String): Boolean {
+        val cleanCpf = cpf.filter { it.isDigit() }
+        return try {
+            val db = writableDatabase
+            val values = ContentValues().apply {
+                put("access_key", newKey)
+            }
+            val rows = db.update(TABLE_USERS, values, "cpf = ?", arrayOf(cleanCpf))
+            rows > 0
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    fun getTransactions(month: String, userCpf: String): List<TransactionModel> {
+        val cleanCpf = userCpf.filter { it.isDigit() }
         val list = mutableListOf<TransactionModel>()
         val db = readableDatabase
-        val cursor = db.rawQuery("SELECT id, month, category, amount, type, description FROM $TABLE_TRANSACTIONS WHERE month = ?", arrayOf(month))
+        val cursor = db.rawQuery("SELECT id, month, category, amount, type, description, user_cpf FROM $TABLE_TRANSACTIONS WHERE month = ? AND user_cpf = ?", arrayOf(month, cleanCpf))
         if (cursor.moveToFirst()) {
             do {
                 list.add(
@@ -151,7 +155,8 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
                         category = cursor.getString(2),
                         amount = cursor.getDouble(3),
                         type = cursor.getString(4),
-                        description = cursor.getString(5)
+                        description = cursor.getString(5),
+                        userCpf = cursor.getString(6) ?: ""
                     )
                 )
             } while (cursor.moveToNext())
@@ -160,10 +165,11 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
         return list
     }
 
-    fun getAllTransactions(): List<TransactionModel> {
+    fun getAllTransactions(userCpf: String): List<TransactionModel> {
+        val cleanCpf = userCpf.filter { it.isDigit() }
         val list = mutableListOf<TransactionModel>()
         val db = readableDatabase
-        val cursor = db.rawQuery("SELECT id, month, category, amount, type, description FROM $TABLE_TRANSACTIONS", null)
+        val cursor = db.rawQuery("SELECT id, month, category, amount, type, description, user_cpf FROM $TABLE_TRANSACTIONS WHERE user_cpf = ?", arrayOf(cleanCpf))
         if (cursor.moveToFirst()) {
             do {
                 list.add(
@@ -173,7 +179,8 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
                         category = cursor.getString(2),
                         amount = cursor.getDouble(3),
                         type = cursor.getString(4),
-                        description = cursor.getString(5)
+                        description = cursor.getString(5),
+                        userCpf = cursor.getString(6) ?: ""
                     )
                 )
             } while (cursor.moveToNext())
@@ -182,10 +189,11 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
         return list
     }
 
-    fun getGoals(): List<GoalModel> {
+    fun getGoals(userCpf: String): List<GoalModel> {
+        val cleanCpf = userCpf.filter { it.isDigit() }
         val list = mutableListOf<GoalModel>()
         val db = readableDatabase
-        val cursor = db.rawQuery("SELECT id, table_name, category, target_amount, tolerance FROM $TABLE_GOALS", null)
+        val cursor = db.rawQuery("SELECT id, table_name, category, target_amount, tolerance, user_cpf FROM $TABLE_GOALS WHERE user_cpf = ?", arrayOf(cleanCpf))
         if (cursor.moveToFirst()) {
             do {
                 list.add(
@@ -194,7 +202,8 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
                         tableName = cursor.getString(1) ?: "GERAL",
                         category = cursor.getString(2),
                         targetAmount = cursor.getDouble(3),
-                        tolerance = cursor.getDouble(4)
+                        tolerance = cursor.getDouble(4),
+                        userCpf = cursor.getString(5) ?: ""
                     )
                 )
             } while (cursor.moveToNext())
@@ -203,39 +212,46 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
         return list
     }
 
-    fun addGoal(tableName: String, category: String, targetAmount: Double, tolerance: Double) {
+    fun addGoal(tableName: String, category: String, targetAmount: Double, tolerance: Double, userCpf: String) {
+        val cleanCpf = userCpf.filter { it.isDigit() }
         val db = writableDatabase
         val values = ContentValues().apply {
             put("table_name", tableName)
             put("category", category)
             put("target_amount", targetAmount)
             put("tolerance", tolerance)
+            put("user_cpf", cleanCpf)
         }
         db.insert(TABLE_GOALS, null, values)
     }
 
-    fun updateGoal(id: Long, tableName: String, category: String, targetAmount: Double, tolerance: Double) {
+    fun updateGoal(id: Long, tableName: String, category: String, targetAmount: Double, tolerance: Double, userCpf: String) {
+        val cleanCpf = userCpf.filter { it.isDigit() }
         val db = writableDatabase
         val values = ContentValues().apply {
             put("table_name", tableName)
             put("category", category)
             put("target_amount", targetAmount)
             put("tolerance", tolerance)
+            put("user_cpf", cleanCpf)
         }
-        db.update(TABLE_GOALS, values, "id = ?", arrayOf(id.toString()))
+        db.update(TABLE_GOALS, values, "id = ? AND user_cpf = ?", arrayOf(id.toString(), cleanCpf))
     }
 
-    fun deleteGoal(id: Long) {
+    fun deleteGoal(id: Long, userCpf: String) {
+        val cleanCpf = userCpf.filter { it.isDigit() }
         val db = writableDatabase
-        db.delete(TABLE_GOALS, "id = ?", arrayOf(id.toString()))
+        db.delete(TABLE_GOALS, "id = ? AND user_cpf = ?", arrayOf(id.toString(), cleanCpf))
     }
 
-    fun deleteTable(tableName: String) {
+    fun deleteTable(tableName: String, userCpf: String) {
+        val cleanCpf = userCpf.filter { it.isDigit() }
         val db = writableDatabase
-        db.delete(TABLE_GOALS, "table_name = ?", arrayOf(tableName))
+        db.delete(TABLE_GOALS, "table_name = ? AND user_cpf = ?", arrayOf(tableName, cleanCpf))
     }
 
-    fun addTransaction(month: String, category: String, amount: Double, type: String, description: String) {
+    fun addTransaction(month: String, category: String, amount: Double, type: String, description: String, userCpf: String) {
+        val cleanCpf = userCpf.filter { it.isDigit() }
         val db = writableDatabase
         val values = ContentValues().apply {
             put("month", month)
@@ -243,7 +259,14 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
             put("amount", amount)
             put("type", type)
             put("description", description)
+            put("user_cpf", cleanCpf)
         }
         db.insert(TABLE_TRANSACTIONS, null, values)
+    }
+
+    fun deleteTransaction(id: Long, userCpf: String) {
+        val cleanCpf = userCpf.filter { it.isDigit() }
+        val db = writableDatabase
+        db.delete(TABLE_TRANSACTIONS, "id = ? AND user_cpf = ?", arrayOf(id.toString(), cleanCpf))
     }
 }

@@ -7,6 +7,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.*
 import com.pedro.finances.data.DatabaseHelper
 import com.pedro.finances.ui.login.LoginScreen
+import com.pedro.finances.ui.login.RegisterScreen
 import com.pedro.finances.ui.main.MainScreen
 import com.pedro.finances.ui.theme.FinanceSTheme
 
@@ -20,17 +21,30 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             FinanceSTheme {
-                var isLoggedIn by remember { mutableStateOf(false) }
+                var currentScreen by remember { mutableStateOf("login") } // "login", "register", "main"
+                var loggedInCpf by remember { mutableStateOf("") }
 
-                if (!isLoggedIn) {
-                    LoginScreen(
+                when (currentScreen) {
+                    "login" -> LoginScreen(
                         dbHelper = dbHelper,
-                        onLoginSuccess = { isLoggedIn = true }
+                        onLoginSuccess = { cpf ->
+                            loggedInCpf = cpf
+                            currentScreen = "main"
+                        },
+                        onNavigateToRegister = { currentScreen = "register" }
                     )
-                } else {
-                    MainScreen(
+                    "register" -> RegisterScreen(
                         dbHelper = dbHelper,
-                        onLogout = { isLoggedIn = false }
+                        onRegisterSuccess = { currentScreen = "login" },
+                        onBack = { currentScreen = "login" }
+                    )
+                    "main" -> MainScreen(
+                        dbHelper = dbHelper,
+                        userCpf = loggedInCpf,
+                        onLogout = {
+                            loggedInCpf = ""
+                            currentScreen = "login"
+                        }
                     )
                 }
             }

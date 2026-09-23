@@ -35,7 +35,7 @@ sealed class Screen(val route: String, val title: String, val icon: ImageVector)
 }
 
 @Composable
-fun MainScreen(dbHelper: DatabaseHelper, onLogout: () -> Unit) {
+fun MainScreen(dbHelper: DatabaseHelper, userCpf: String, onLogout: () -> Unit) {
     var currentScreen by remember { mutableStateOf<Screen>(Screen.Inicio) }
     val screens = listOf(
         Screen.Inicio,
@@ -102,10 +102,10 @@ fun MainScreen(dbHelper: DatabaseHelper, onLogout: () -> Unit) {
                 .padding(innerPadding)
         ) {
             when (currentScreen) {
-                is Screen.Inicio -> InicioScreen(dbHelper)
-                is Screen.Metas -> MetasScreen(dbHelper)
-                is Screen.Analise -> AnaliseScreen(dbHelper)
-                is Screen.Lancamentos -> LancamentosScreen(dbHelper)
+                is Screen.Inicio -> InicioScreen(dbHelper, userCpf)
+                is Screen.Metas -> MetasScreen(dbHelper, userCpf)
+                is Screen.Analise -> AnaliseScreen(dbHelper, userCpf)
+                is Screen.Lancamentos -> LancamentosScreen(dbHelper, userCpf)
                 is Screen.Atualizacoes -> AtualizacoesScreen(onLogout)
             }
         }

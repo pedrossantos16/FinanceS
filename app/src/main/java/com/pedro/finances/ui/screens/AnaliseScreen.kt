@@ -23,10 +23,10 @@ import com.pedro.finances.data.GoalModel
 import com.pedro.finances.data.TransactionModel
 
 @Composable
-fun AnaliseScreen(dbHelper: DatabaseHelper) {
+fun AnaliseScreen(dbHelper: DatabaseHelper, userCpf: String) {
     var selectedYear by remember { mutableStateOf(2026) }
-    val transactions = remember { dbHelper.getAllTransactions() }
-    val goals = remember { dbHelper.getGoals() }
+    val transactions = remember { dbHelper.getAllTransactions(userCpf) }
+    val goals = remember { dbHelper.getGoals(userCpf) }
 
     val validGoals = goals.filter { it.category.isNotBlank() }
     val defaultGoalCategory = validGoals.firstOrNull()?.category ?: "GERAL"
@@ -98,19 +98,21 @@ fun AnaliseScreen(dbHelper: DatabaseHelper) {
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // 1. Ganhos vs Gastos por Mês (Column Chart)
-        ChartCard(
-            title = "1. Total de Ganhos vs Gastos por Mês",
-            subtitle = "Toque no gráfico para ver detalhes e tabela",
-            onClick = { activeDetailChart = "ganhos_gastos" }
-        ) {
-            GanhosGastosColumnChart(transactions, fullMonthsList)
+        if (transactions.isNotEmpty()) {
+            // 1. Ganhos vs Gastos por Mês (Column Chart)
+            ChartCard(
+                title = "1. Total de Ganhos vs Gastos por Mês",
+                subtitle = "Toque no gráfico para ver detalhes e tabela",
+                onClick = { activeDetailChart = "ganhos_gastos" }
+            ) {
+                GanhosGastosColumnChart(transactions, fullMonthsList)
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // 2. Meta vs Atingido no Mês (Line Chart) - Only show if valid goals exist
-        if (validGoals.isNotEmpty()) {
+        // 2. Meta vs Atingido no Mês (Line Chart) - Only show if valid goals & transactions exist
+        if (validGoals.isNotEmpty() && transactions.isNotEmpty()) {
             ChartCard(
                 title = "2. Meta vs Atingido no Mês",
                 subtitle = "Categoria: $selectedGoalForLine (Toque para detalhes)",
@@ -137,30 +139,32 @@ fun AnaliseScreen(dbHelper: DatabaseHelper) {
             Spacer(modifier = Modifier.height(16.dp))
         }
 
-        // 3. Pizza de Gastos sobre a Renda Total (Pie Chart)
-        ChartCard(
-            title = "3. Percentual de Gastos sobre a Renda (100%)",
-            subtitle = "Sobra em destaque verde (Toque para detalhes)",
-            onClick = { activeDetailChart = "pizza_gastos" }
-        ) {
-            GastosPizzaChart(transactions)
+        if (transactions.isNotEmpty()) {
+            // 3. Pizza de Gastos sobre a Renda Total (Pie Chart)
+            ChartCard(
+                title = "3. Percentual de Gastos sobre a Renda (100%)",
+                subtitle = "Sobra em destaque verde (Toque para detalhes)",
+                onClick = { activeDetailChart = "pizza_gastos" }
+            ) {
+                GastosPizzaChart(transactions)
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // 4. Investimentos por Mês (Column Chart)
+            ChartCard(
+                title = "4. Investimentos por Mês",
+                subtitle = "Categoria: INVESTIMENTO (Toque para detalhes)",
+                onClick = { activeDetailChart = "investimentos" }
+            ) {
+                InvestimentosColumnChart(transactions, fullMonthsList)
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // 4. Investimentos por Mês (Column Chart)
-        ChartCard(
-            title = "4. Investimentos por Mês",
-            subtitle = "Categoria: INVESTIMENTO (Toque para detalhes)",
-            onClick = { activeDetailChart = "investimentos" }
-        ) {
-            InvestimentosColumnChart(transactions, fullMonthsList)
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // 5. Tolerância vs Erro por Categoria (Line Chart) - Only show if valid goals exist
-        if (validGoals.isNotEmpty()) {
+        // 5. Tolerância vs Erro por Categoria (Line Chart) - Only show if valid goals & transactions exist
+        if (validGoals.isNotEmpty() && transactions.isNotEmpty()) {
             ChartCard(
                 title = "5. Tolerância vs Erro (%) em Relação à Meta",
                 subtitle = "Comparativo de desvios percentuais (Toque para detalhes)",
@@ -169,6 +173,20 @@ fun AnaliseScreen(dbHelper: DatabaseHelper) {
                 ToleranciaErroLineChart(transactions, validGoals)
             }
             Spacer(modifier = Modifier.height(16.dp))
+        }
+
+        if (transactions.isEmpty()) {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E1E)),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = "Nenhum lançamento cadastrado. Adicione transações na aba Lançar para visualizar os gráficos.",
+                    color = Color.Gray,
+                    fontSize = 13.sp,
+                    modifier = Modifier.padding(16.dp)
+                )
+            }
         }
 
         Spacer(modifier = Modifier.height(32.dp))
@@ -198,7 +216,6 @@ fun SugestoesModal(goals: List<GoalModel>, transactions: List<TransactionModel>,
     var totalExcess = 0.0
     var totalDeficit = 0.0
 
-    // Fallback reference to first category if any goal has empty category
     val effectiveGoals = goals.map { g ->
         if (g.category.isBlank() && goals.isNotEmpty()) goals.first() else g
     }

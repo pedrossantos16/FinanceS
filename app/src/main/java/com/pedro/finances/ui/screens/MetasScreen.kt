@@ -5,7 +5,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -24,29 +23,24 @@ import com.pedro.finances.data.GoalModel
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun MetasScreen(dbHelper: DatabaseHelper) {
-    var goals by remember { mutableStateOf(dbHelper.getGoals()) }
+fun MetasScreen(dbHelper: DatabaseHelper, userCpf: String) {
+    var goals by remember { mutableStateOf(dbHelper.getGoals(userCpf)) }
     
-    // Dialog to name a new table
     var showCreateTableDialog by remember { mutableStateOf(false) }
     var newTableName by remember { mutableStateOf("") }
 
-    // Dialog to add a row to a specific table
     var showAddRowDialogForTable by remember { mutableStateOf<String?>(null) }
     var newCategory by remember { mutableStateOf("") }
     var newTarget by remember { mutableStateOf("") }
     var newTolerance by remember { mutableStateOf("") }
 
-    // Edit cell dialog
     var editingGoal by remember { mutableStateOf<GoalModel?>(null) }
-    var editField by remember { mutableStateOf("") } // "category", "target", "tolerance"
+    var editField by remember { mutableStateOf("") }
     var editValue by remember { mutableStateOf("") }
 
-    // Selected row for delete/duplicate
     var selectedGoalId by remember { mutableStateOf<Long?>(null) }
 
-    // Group goals by table name
-    val groupedGoals = goals.groupBy { hb -> hb.tableName }
+    val groupedGoals = goals.groupBy { it.tableName }
 
     Column(
         modifier = Modifier
@@ -63,7 +57,6 @@ fun MetasScreen(dbHelper: DatabaseHelper) {
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        // Button to create a new meta table
         Button(
             onClick = { showCreateTableDialog = true },
             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFD700)),
@@ -89,7 +82,6 @@ fun MetasScreen(dbHelper: DatabaseHelper) {
                                 .fillMaxWidth()
                                 .padding(12.dp)
                         ) {
-                            // Table Title Header with delete table option
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -102,8 +94,8 @@ fun MetasScreen(dbHelper: DatabaseHelper) {
                                     fontSize = 14.sp
                                 )
                                 IconButton(onClick = {
-                                    dbHelper.deleteTable(tableName)
-                                    goals = dbHelper.getGoals()
+                                    dbHelper.deleteTable(tableName, userCpf)
+                                    goals = dbHelper.getGoals(userCpf)
                                 }) {
                                     Icon(imageVector = Icons.Default.Delete, contentDescription = "Deletar Tabela", tint = Color.Red, modifier = Modifier.size(20.dp))
                                 }
@@ -111,7 +103,6 @@ fun MetasScreen(dbHelper: DatabaseHelper) {
 
                             Spacer(modifier = Modifier.height(8.dp))
 
-                            // Table Fields Header
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -126,7 +117,6 @@ fun MetasScreen(dbHelper: DatabaseHelper) {
 
                             Spacer(modifier = Modifier.height(4.dp))
 
-                            // Rows
                             tableGoals.forEach { goal ->
                                 val isSelected = selectedGoalId == goal.id
 
@@ -149,7 +139,6 @@ fun MetasScreen(dbHelper: DatabaseHelper) {
                                         horizontalArrangement = Arrangement.SpaceBetween,
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        // Category Cell
                                         Box(
                                             modifier = Modifier
                                                 .weight(1.2f)
@@ -165,7 +154,6 @@ fun MetasScreen(dbHelper: DatabaseHelper) {
                                             Text(text = goal.category, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                                         }
 
-                                        // Target Cell
                                         Box(
                                             modifier = Modifier
                                                 .weight(1f)
@@ -181,7 +169,6 @@ fun MetasScreen(dbHelper: DatabaseHelper) {
                                             Text(text = "R$ %.2f".format(goal.targetAmount), color = Color.Gray, fontSize = 13.sp)
                                         }
 
-                                        // Tolerance Cell
                                         Box(
                                             modifier = Modifier
                                                 .weight(1f)
@@ -201,8 +188,8 @@ fun MetasScreen(dbHelper: DatabaseHelper) {
                                             Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
                                                 IconButton(
                                                     onClick = {
-                                                        dbHelper.deleteGoal(goal.id)
-                                                        goals = dbHelper.getGoals()
+                                                        dbHelper.deleteGoal(goal.id, userCpf)
+                                                        goals = dbHelper.getGoals(userCpf)
                                                         selectedGoalId = null
                                                     },
                                                     modifier = Modifier.size(28.dp)
@@ -211,8 +198,8 @@ fun MetasScreen(dbHelper: DatabaseHelper) {
                                                 }
                                                 IconButton(
                                                     onClick = {
-                                                        dbHelper.addGoal(tableName, "${goal.category}_CÓPIA", goal.targetAmount, goal.tolerance)
-                                                        goals = dbHelper.getGoals()
+                                                        dbHelper.addGoal(tableName, "${goal.category}_CÓPIA", goal.targetAmount, goal.tolerance, userCpf)
+                                                        goals = dbHelper.getGoals(userCpf)
                                                         selectedGoalId = null
                                                     },
                                                     modifier = Modifier.size(28.dp)
@@ -227,7 +214,6 @@ fun MetasScreen(dbHelper: DatabaseHelper) {
 
                             Spacer(modifier = Modifier.height(8.dp))
 
-                            // "+" button at the bottom of the table to add a new row
                             Button(
                                 onClick = { showAddRowDialogForTable = tableName },
                                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2C2C2C)),
@@ -245,7 +231,6 @@ fun MetasScreen(dbHelper: DatabaseHelper) {
         }
     }
 
-    // Dialog to Create a New Table
     if (showCreateTableDialog) {
         AlertDialog(
             onDismissRequest = { showCreateTableDialog = false },
@@ -270,8 +255,8 @@ fun MetasScreen(dbHelper: DatabaseHelper) {
                 Button(
                     onClick = {
                         if (newTableName.isNotBlank()) {
-                            dbHelper.addGoal(newTableName.uppercase(), "NOVA CATEGORIA", 0.0, 0.0)
-                            goals = dbHelper.getGoals()
+                            dbHelper.addGoal(newTableName.uppercase(), "", 0.0, 0.0, userCpf)
+                            goals = dbHelper.getGoals(userCpf)
                             newTableName = ""
                             showCreateTableDialog = false
                         }
@@ -289,7 +274,6 @@ fun MetasScreen(dbHelper: DatabaseHelper) {
         )
     }
 
-    // Dialog to Add a Row to a Specific Table
     if (showAddRowDialogForTable != null) {
         AlertDialog(
             onDismissRequest = { showAddRowDialogForTable = null },
@@ -323,8 +307,8 @@ fun MetasScreen(dbHelper: DatabaseHelper) {
                         val target = newTarget.toDoubleOrNull() ?: 0.0
                         val tolerance = newTolerance.toDoubleOrNull() ?: 0.0
                         if (newCategory.isNotBlank()) {
-                            dbHelper.addGoal(showAddRowDialogForTable!!, newCategory.uppercase(), target, tolerance)
-                            goals = dbHelper.getGoals()
+                            dbHelper.addGoal(showAddRowDialogForTable!!, newCategory.uppercase(), target, tolerance, userCpf)
+                            goals = dbHelper.getGoals(userCpf)
                             newCategory = ""
                             newTarget = ""
                             newTolerance = ""
@@ -344,7 +328,6 @@ fun MetasScreen(dbHelper: DatabaseHelper) {
         )
     }
 
-    // Edit Cell Dialog
     if (editingGoal != null) {
         AlertDialog(
             onDismissRequest = { editingGoal = null },
@@ -367,8 +350,8 @@ fun MetasScreen(dbHelper: DatabaseHelper) {
                         val newTarget = if (editField == "target") editValue.toDoubleOrNull() ?: g.targetAmount else g.targetAmount
                         val newTol = if (editField == "tolerance") editValue.toDoubleOrNull() ?: g.tolerance else g.tolerance
 
-                        dbHelper.updateGoal(g.id, g.tableName, newCat, newTarget, newTol)
-                        goals = dbHelper.getGoals()
+                        dbHelper.updateGoal(g.id, g.tableName, newCat, newTarget, newTol, userCpf)
+                        goals = dbHelper.getGoals(userCpf)
                         editingGoal = null
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFD700))

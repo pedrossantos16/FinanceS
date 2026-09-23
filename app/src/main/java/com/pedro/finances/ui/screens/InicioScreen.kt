@@ -21,15 +21,15 @@ import com.pedro.finances.data.DatabaseHelper
 import com.pedro.finances.data.TransactionModel
 
 @Composable
-fun InicioScreen(dbHelper: DatabaseHelper) {
+fun InicioScreen(dbHelper: DatabaseHelper, userCpf: String) {
     var selectedMonth by remember { mutableStateOf("AGOSTO") }
     var selectedYear by remember { mutableStateOf(2026) }
     var expanded by remember { mutableStateOf(false) }
-    var transactions by remember { mutableStateOf(dbHelper.getTransactions(selectedMonth)) }
+    var transactions by remember { mutableStateOf(dbHelper.getTransactions(selectedMonth, userCpf)) }
     var isCompactView by remember { mutableStateOf(false) }
 
-    LaunchedEffect(selectedMonth, selectedYear) {
-        transactions = dbHelper.getTransactions(selectedMonth)
+    LaunchedEffect(selectedMonth, selectedYear, userCpf) {
+        transactions = dbHelper.getTransactions(selectedMonth, userCpf)
     }
 
     val totalIncome = transactions.filter { it.type == "INCOME" }.sumOf { it.amount }
@@ -200,7 +200,6 @@ fun InicioScreen(dbHelper: DatabaseHelper) {
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     if (isCompactView) {
-                        // Compact List View: just name, card colored by type (green for income, red for expense)
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -215,7 +214,6 @@ fun InicioScreen(dbHelper: DatabaseHelper) {
                             )
                         }
                     } else {
-                        // Detailed Expanded View: category, date, and amount
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
