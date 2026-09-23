@@ -41,7 +41,8 @@ fun MainScreen(dbHelper: DatabaseHelper) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(16.dp),
+                    .navigationBarsPadding()
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Surface(
