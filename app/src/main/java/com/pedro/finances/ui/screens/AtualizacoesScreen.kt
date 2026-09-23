@@ -1,5 +1,6 @@
 package com.pedro.finances.ui.screens
 
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.background
@@ -29,6 +30,12 @@ import java.net.URL
 @Composable
 fun AtualizacoesScreen(onLogout: () -> Unit) {
     val context = LocalContext.current
+    val sharedPreferences = remember { context.getSharedPreferences("finance_prefs", Context.MODE_PRIVATE) }
+
+    var repoOwner by remember { mutableStateOf(sharedPreferences.getString("github_owner", "seu-usuario") ?: "seu-usuario") }
+    var repoName by remember { mutableStateOf(sharedPreferences.getString("github_repo", "FinanceS") ?: "FinanceS") }
+    var showConfigDialog by remember { mutableStateOf(false) }
+
     val currentVersion = com.pedro.finances.BuildConfig.VERSION_NAME
     var updateStatus by remember { mutableStateOf("Clique em verificar para checar atualizações") }
     var latestVersion by remember { mutableStateOf("") }
@@ -89,17 +96,28 @@ fun AtualizacoesScreen(onLogout: () -> Unit) {
 
         Spacer(modifier = Modifier.height(16.dp))
 
+        OutlinedButton(
+            onClick = { showConfigDialog = true },
+            modifier = Modifier.fillMaxWidth(),
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFFFD700))
+        ) {
+            Text("Configurar Repositório GitHub ($repoOwner/$repoName)", fontSize = 12.sp)
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
         Button(
             onClick = {
+                if (repoOwner == "seu-usuario") {
+                    updateStatus = "Configure seu usuário do GitHub acima!"
+                    return@Button
+                }
+
                 isChecking = true
                 updateStatus = "Verificando no GitHub..."
                 coroutineScope.launch {
                     val result = withContext(Dispatchers.IO) {
                         try {
-                            // IMPORTANTE: Substitua "seu-usuario" pelo seu usuário real do GitHub
-                            // e "FinanceS" pelo nome do seu repositório quando publicar.
-                            val repoOwner = "seu-usuario"
-                            val repoName = "FinanceS"
                             val url = URL("https://api.github.com/repos/$repoOwner/$repoName/releases/latest")
                             
                             val connection = (url.openConnection() as HttpURLConnection).apply {
@@ -128,7 +146,6 @@ fun AtualizacoesScreen(onLogout: () -> Unit) {
                                 Triple(false, currentVersion, "")
                             }
                         } catch (e: Exception) {
-                            // Se o repositório ainda não existir ou sem conexão, retorna sem atualizações
                             Triple(false, currentVersion, "")
                         }
                     }
@@ -236,6 +253,55 @@ fun AtualizacoesScreen(onLogout: () -> Unit) {
         Spacer(modifier = Modifier.height(32.dp))
     }
 
+    // GitHub Config Dialog
+    if (showConfigDialog) {
+        var tempOwner by remember { mutableStateOf(repoOwner) }
+        var tempRepo by remember { mutableStateOf(repoName) }
+
+        AlertDialog(
+            onDismissRequest = { showConfigDialog = false },
+            containerColor = Color(0xFF1E1E1E),
+            title = { Text("Configurar Repositório GitHub", color = Color(0xFFFFD700), fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("Insira seu nome de usuário do GitHub e o nome do repositório onde criou o Release:", color = Color.White, fontSize = 13.sp)
+                    OutlinedTextField(
+                        value = tempOwner,
+                        onValueChange = { tempOwner = it },
+                        label = { Text("Usuário do GitHub") },
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                    )
+                    OutlinedTextField(
+                        value = tempRepo,
+                        onValueChange = { tempRepo = it },
+                        label = { Text("Nome do Repositório") },
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        repoOwner = tempOwner
+                        repoName = tempRepo
+                        sharedPreferences.edit().putString("github_owner", repoOwner).putString("github_repo", repoName).apply()
+                        showConfigDialog = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFD700))
+                ) {
+                    Text("Salvar", color = Color.Black, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showConfigDialog = false }) {
+                    Text("Cancelar", color = Color.LightGray)
+                }
+            }
+        )
+    }
+
     // Account Management Dialog
     if (showAccountDialog) {
         AlertDialog(
@@ -247,14 +313,14 @@ fun AtualizacoesScreen(onLogout: () -> Unit) {
                     OutlinedButton(
                         onClick = { /* TODO */ },
                         modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFFFD700))
                     ) {
                         Text("Adicionar / Trocar Conta")
                     }
                     OutlinedButton(
                         onClick = { /* TODO */ },
                         modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFFFD700))
                     ) {
                         Text("Editar Login / Chave de Acesso")
                     }
